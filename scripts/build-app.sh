@@ -28,23 +28,23 @@ cd "$ROOT"
 
 build_one() {
   local triple="$1"
-  swift build -c release --arch "$triple"
-  echo ".build/$triple-apple-macosx/release/ClipHist"
+  swift build -c release --arch "$triple" 1>&2
+  swift build -c release --arch "$triple" --show-bin-path
 }
 
 case "$ARCH" in
   arm64)
-    BIN_PATH="$(build_one arm64)"
-    cp "$BIN_PATH" "$MACOS_DIR/ClipHist"
+    BIN_DIR="$(build_one arm64)"
+    cp "$BIN_DIR/ClipHist" "$MACOS_DIR/ClipHist"
     ;;
   x86_64)
-    BIN_PATH="$(build_one x86_64)"
-    cp "$BIN_PATH" "$MACOS_DIR/ClipHist"
+    BIN_DIR="$(build_one x86_64)"
+    cp "$BIN_DIR/ClipHist" "$MACOS_DIR/ClipHist"
     ;;
   universal)
-    ARM_BIN="$(build_one arm64)"
-    X86_BIN="$(build_one x86_64)"
-    lipo -create -output "$MACOS_DIR/ClipHist" "$ARM_BIN" "$X86_BIN"
+    ARM_DIR="$(build_one arm64)"
+    X86_DIR="$(build_one x86_64)"
+    lipo -create -output "$MACOS_DIR/ClipHist" "$ARM_DIR/ClipHist" "$X86_DIR/ClipHist"
     ;;
   *) echo "invalid --arch: $ARCH" >&2; exit 1 ;;
 esac
