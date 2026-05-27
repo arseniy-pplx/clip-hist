@@ -5,7 +5,28 @@ import Carbon.HIToolbox
 /// Writes a `ClipboardItem` back to the system pasteboard and synthesizes ⌘V
 /// so the front app receives a paste event.
 public enum Paster {
-    public static func paste(_ item: ClipboardItem, pasteboard: NSPasteboard = .general) {
+
+    /// Writes the item to the pasteboard. If `targetPID` is provided, that app
+    /// is reactivated first and the synthetic ⌘V is delivered after a short
+    /// delay so the destination app's text field has time to regain focus.
+    public static func paste(
+        _ item: ClipboardItem,
+        targetPID: pid_t? = nil,
+        pasteboard: NSPasteboard = .general
+    ) {
+        writeToPasteboard(item, pasteboard: pasteboard)
+        let activated = activate(pid: targetPID)
+        // Slightly longer delay when we had to reactivate another app.
+        synthesizeCommandV(delay: activated ? 0.12 : 0.05)
+    }
+
+    /// Just copy the item to the pasteboard — used when "paste on click" is
+    /// disabled and the user only wants to refresh the current clipboard.
+    public static func copyToClipboard(_ item: ClipboardItem, pasteboard: NSPasteboard = .general) {
+        writeToPasteboard(item, pasteboard: pasteboard)
+    }
+
+    private static func writeToPasteboard(_ item: ClipboardItem, pasteboard: NSPasteboard) {
         pasteboard.clearContents()
         switch item.kind {
         case .text:
@@ -28,19 +49,26 @@ public enum Paster {
                 pasteboard.writeObjects(urls as [NSURL])
             }
         }
-        synthesizeCommandV()
+    }
+
+    @discardableResult
+    private static func activate(pid: pid_t?) -> Bool {
+        guard let pid = pid,
+              let app = NSRunningApplication(processIdentifier: pid)
+        else { return false }
+        return app.activate(options: [])
     }
 
     /// Posts a synthetic ⌘V key-down/key-up pair to the active application.
-    private static func synthesizeCommandV() {
+    private static func synthesizeCommandV(delay: TimeInterval) {
         let source = CGEventSource(stateID: .combinedSessionState)
         let vKey: CGKeyCode = 9 // kVK_ANSI_V
         let down = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true)
         down?.flags = .maskCommand
         let up = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: false)
         up?.flags = .maskCommand
-        // Slight delay lets the pasteboard settle before the keystroke is delivered.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        // Slight delay lets the pasteboard settle and the target app regain focus.
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             down?.post(tap: .cghidEventTap)
             up?.post(tap: .cghidEventTap)
         }

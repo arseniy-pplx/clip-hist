@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file. Format based on
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-27
+
+### Added
+- **Pinned items** — pin/unpin via right-click, hover button, or `⌘P`. Pinned items sort to the top and are exempt from capacity eviction.
+- **Image preview thumbnails** inline in history rows.
+- **Row hover highlight** and selection highlight.
+- **Full keyboard navigation**: `↑`/`↓` (with cross-page auto-advance), `⏎` to paste, `⌘1`–`⌘9` quick-paste, `⌘P` pin, `⌫` delete, `Esc` close.
+- **Paste-on-click vs select-on-click** setting. When off, clicking a row only copies it to the system clipboard; `⏎` always pastes.
+- **App icon** — generated `AppIcon.icns` (clipboard glyph on blue squircle), embedded in the bundle.
+- **DMG installer with installer UI** — `create-dmg` layout with custom background, drag-to-Applications hint, volume icon.
+- **Frontmost-app tracking** so the panel anchors near the previously-active app's focused field (instead of ClipHist's own window) and returns focus before pasting.
+- Backward-compatible decoding for v0.1 history and settings JSON.
+
+### Fixed
+- **Settings window layout** — labels no longer clip on the left and the "Reset" button no longer clips on the right; sliders constrained, alignment normalized.
+- **Hotkey-opened panel** now correctly anchors near the focused input field of the previously-active app (was falling back to the status item because ClipHist had just stolen focus).
+
 ## [0.1.0] — 2026-05-27
 
 ### Added

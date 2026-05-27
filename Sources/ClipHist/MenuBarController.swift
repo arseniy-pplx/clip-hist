@@ -7,19 +7,27 @@ final class MenuBarController: NSObject, NSWindowDelegate {
     private let historyStore: HistoryStore
     private let settingsProvider: () -> AppSettings
     private let onUpdateSettings: (AppSettings) -> Void
+    private let externalAppPIDProvider: () -> pid_t?
 
     private let statusItem: NSStatusItem
     private var panel: NSPanel?
     private var settingsWindow: NSWindow?
+    /// The frame of the focused field in the previously-active app at the moment
+    /// the panel was opened (used for anchoring).
+    private var lastAnchorRect: CGRect?
+    /// PID we should hand focus back to when pasting.
+    private var pasteTargetPID: pid_t?
 
     init(
         historyStore: HistoryStore,
         settingsProvider: @escaping () -> AppSettings,
-        onUpdateSettings: @escaping (AppSettings) -> Void
+        onUpdateSettings: @escaping (AppSettings) -> Void,
+        externalAppPIDProvider: @escaping () -> pid_t?
     ) {
         self.historyStore = historyStore
         self.settingsProvider = settingsProvider
         self.onUpdateSettings = onUpdateSettings
+        self.externalAppPIDProvider = externalAppPIDProvider
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         configureStatusItem()
@@ -43,13 +51,14 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         if event?.type == .rightMouseUp {
             showStatusMenu()
         } else {
-            togglePanel()
+            // Status-item click → anchor to the status item, not the input field.
+            togglePanel(anchorMode: .statusItem)
         }
     }
 
     private func showStatusMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Show History", action: #selector(togglePanel), keyEquivalent: "")
+        menu.addItem(withTitle: "Show History", action: #selector(showPanelFromMenu), keyEquivalent: "")
             .target = self
         menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
             .target = self
@@ -64,13 +73,38 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         statusItem.menu = nil // detach so left-clicks remain custom
     }
 
+    @objc private func showPanelFromMenu() {
+        togglePanel(anchorMode: .statusItem)
+    }
+
     // MARK: - Panel
 
-    @objc func togglePanel() {
+    enum AnchorMode {
+        case auto       // hotkey path: try focused field, fall back to status item
+        case statusItem // click path
+    }
+
+    /// Hotkey entry point.
+    func togglePanel() {
+        togglePanel(anchorMode: .auto)
+    }
+
+    private func togglePanel(anchorMode: AnchorMode) {
         if let panel = panel, panel.isVisible {
             panel.orderOut(nil)
             return
         }
+        // Capture the external app's identity *before* we activate ourselves.
+        pasteTargetPID = externalAppPIDProvider()
+        let settings = settingsProvider()
+        let anchor: CGRect?
+        switch anchorMode {
+        case .auto where settings.anchorNearFocusedField:
+            anchor = FocusedFieldLocator.focusedFieldFrame(pid: pasteTargetPID)
+        default:
+            anchor = nil
+        }
+        lastAnchorRect = anchor
         showPanel()
     }
 
@@ -88,19 +122,17 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         let view = HistoryPanelView(
             store: historyStore,
             settings: settingsProvider(),
-            onPick: { [weak self] item in
-                self?.pick(item: item)
-            },
-            onOpenSettings: { [weak self] in
-                self?.showSettings()
-            },
-            onClear: { [weak self] in
-                self?.historyStore.clear()
-            }
+            onPick: { [weak self] item in self?.pick(item: item) },
+            onCopy: { [weak self] item in self?.copyToClipboard(item: item) },
+            onTogglePin: { [weak self] item in self?.historyStore.togglePin(id: item.id) },
+            onDelete: { [weak self] item in self?.historyStore.remove(id: item.id) },
+            onClose: { [weak self] in self?.panel?.orderOut(nil) },
+            onOpenSettings: { [weak self] in self?.showSettings() },
+            onClear: { [weak self] in self?.historyStore.clear() }
         )
         let hosting = NSHostingController(rootView: view)
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 480),
             styleMask: [.nonactivatingPanel, .fullSizeContentView, .titled, .closable],
             backing: .buffered,
             defer: false
@@ -116,15 +148,12 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         return panel
     }
 
-    /// Computes a top-left origin for the dropdown that is anchored near the
-    /// focused text field when possible, falling back to the status item.
+    /// Computes a top-left origin for the dropdown that prefers the captured
+    /// anchor rect (focused input field) and falls back to the status item.
     private func panelOrigin() -> NSPoint {
-        let settings = settingsProvider()
-        let panelSize = panel?.frame.size ?? CGSize(width: 380, height: 460)
+        let panelSize = panel?.frame.size ?? CGSize(width: 400, height: 480)
 
-        if settings.anchorNearFocusedField,
-           let frame = FocusedFieldLocator.focusedFieldFrame()
-        {
+        if let frame = lastAnchorRect {
             // Place the panel just below the field, left-aligned with it.
             var origin = NSPoint(x: frame.minX, y: frame.minY - 6)
             if let screen = NSScreen.main {
@@ -148,7 +177,11 @@ final class MenuBarController: NSObject, NSWindowDelegate {
 
     private func pick(item: ClipboardItem) {
         panel?.orderOut(nil)
-        Paster.paste(item)
+        Paster.paste(item, targetPID: pasteTargetPID)
+    }
+
+    private func copyToClipboard(item: ClipboardItem) {
+        Paster.copyToClipboard(item)
     }
 
     // MARK: - Window delegate
@@ -173,7 +206,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         )
         let hosting = NSHostingController(rootView: view)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 460),
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 540),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false

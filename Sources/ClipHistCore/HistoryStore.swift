@@ -31,7 +31,8 @@ public final class HistoryStore: @unchecked Sendable {
         self.capacity = max(1, capacity)
         self.storageURL = storageURL
         if let url = storageURL, let loaded = Self.load(from: url) {
-            self.items = Array(loaded.prefix(self.capacity))
+            self.items = loaded
+            evictLocked()
         }
     }
 
@@ -43,19 +44,35 @@ public final class HistoryStore: @unchecked Sendable {
     @discardableResult
     public func insert(_ item: ClipboardItem) -> Bool {
         queue.sync {
-            if let head = items.first, head.fingerprint == item.fingerprint {
-                return false
-            }
-            // Move-to-front if the same fingerprint exists elsewhere.
+            // Preserve pin state across re-inserts: if an existing item with the
+            // same fingerprint is pinned, keep it pinned and just refresh recency.
+            var newItem = item
             if let existingIndex = items.firstIndex(where: { $0.fingerprint == item.fingerprint }) {
+                let existing = items[existingIndex]
+                if existing.isPinned { newItem.isPinned = true }
+                // If the head (in sorted order) already matches, treat as no-op.
+                if sortedLocked().first?.fingerprint == item.fingerprint, !newItem.isPinned {
+                    return false
+                }
                 items.remove(at: existingIndex)
             }
-            items.insert(item, at: 0)
-            if items.count > capacity {
-                items.removeLast(items.count - capacity)
-            }
+            items.append(newItem)
+            evictLocked()
             persistLocked()
             return true
+        }
+    }
+
+    /// Toggle pin state for an item. Returns the new state, or nil if not found.
+    @discardableResult
+    public func togglePin(id: UUID) -> Bool? {
+        queue.sync {
+            guard let idx = items.firstIndex(where: { $0.id == id }) else { return nil }
+            items[idx].isPinned.toggle()
+            let newState = items[idx].isPinned
+            evictLocked()
+            persistLocked()
+            return newState
         }
     }
 
@@ -76,29 +93,61 @@ public final class HistoryStore: @unchecked Sendable {
     public func setCapacity(_ newCapacity: Int) {
         queue.sync {
             capacity = max(1, newCapacity)
-            if items.count > capacity {
-                items.removeLast(items.count - capacity)
-            }
+            evictLocked()
             persistLocked()
         }
+    }
+
+    /// Eviction rule: pinned items are never evicted; only unpinned items count
+    /// against `capacity`. Oldest unpinned items are dropped first; array index
+    /// breaks ties when `createdAt` collides (rapid-fire inserts).
+    private func evictLocked() {
+        let indexedUnpinned = items.enumerated().filter { !$0.element.isPinned }
+        guard indexedUnpinned.count > capacity else { return }
+        let excess = indexedUnpinned.count - capacity
+        let sortedOldestFirst = indexedUnpinned.sorted { l, r in
+            if l.element.createdAt != r.element.createdAt {
+                return l.element.createdAt < r.element.createdAt
+            }
+            return l.offset < r.offset
+        }
+        let toRemoveIDs = Set(sortedOldestFirst.prefix(excess).map(\.element.id))
+        items.removeAll { toRemoveIDs.contains($0.id) }
     }
 
     // MARK: - Reads
 
     public var count: Int { queue.sync { items.count } }
 
-    public func all() -> [ClipboardItem] { queue.sync { items } }
+    public func all() -> [ClipboardItem] { queue.sync { sortedLocked() } }
+
+    /// Pinned items first, then newest first. Uses array index as a stable
+    /// tiebreaker when `createdAt` values collide (which happens in tight
+    /// test loops where `Date()` resolution is insufficient).
+    private func sortedLocked() -> [ClipboardItem] {
+        let indexed = items.enumerated().map { ($0.offset, $0.element) }
+        let sorted = indexed.sorted { l, r in
+            let (li, a) = l
+            let (ri, b) = r
+            if a.isPinned != b.isPinned { return a.isPinned && !b.isPinned }
+            if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+            // Same timestamp: items appended later (higher index) sort first.
+            return li > ri
+        }
+        return sorted.map(\.1)
+    }
 
     /// Returns a page of items, optionally filtered by a case-insensitive
     /// substring search over the `text` field.
     public func page(index: Int, size: Int, query: String? = nil) -> Page {
         queue.sync {
             let pageSize = max(1, size)
+            let sorted = sortedLocked()
             let filtered: [ClipboardItem]
             if let q = query?.trimmingCharacters(in: .whitespacesAndNewlines), !q.isEmpty {
-                filtered = items.filter { $0.text.range(of: q, options: .caseInsensitive) != nil }
+                filtered = sorted.filter { $0.text.range(of: q, options: .caseInsensitive) != nil }
             } else {
-                filtered = items
+                filtered = sorted
             }
             let clampedIndex = max(0, index)
             let start = clampedIndex * pageSize

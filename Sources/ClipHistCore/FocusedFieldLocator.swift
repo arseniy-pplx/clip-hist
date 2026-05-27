@@ -3,20 +3,33 @@ import AppKit
 import ApplicationServices
 
 /// Uses the Accessibility API to locate the screen-coordinate frame of the
-/// currently focused UI element (the input field the user is typing into).
+/// focused UI element. Critically, this can target a *specific* process — used
+/// when the panel anchors near the field of the previously-frontmost app rather
+/// than ClipHist itself (which has no useful focused field).
+///
 /// Requires the user to grant Accessibility permission in System Settings.
 public enum FocusedFieldLocator {
-    /// Returns the focused element's frame in Cocoa screen coordinates
-    /// (origin at bottom-left), or `nil` if it can't be determined.
-    public static func focusedFieldFrame() -> CGRect? {
+
+    /// Returns the focused element's frame for the given process ID, in Cocoa
+    /// screen coordinates (origin at bottom-left). Falls back to the system-wide
+    /// focused element if `pid` is nil.
+    public static func focusedFieldFrame(pid: pid_t? = nil) -> CGRect? {
         guard AXIsProcessTrusted() else { return nil }
 
-        let systemWide = AXUIElementCreateSystemWide()
+        let appElement: AXUIElement
+        if let pid = pid {
+            appElement = AXUIElementCreateApplication(pid)
+        } else {
+            let systemWide = AXUIElementCreateSystemWide()
+            guard let app: AXUIElement = copyAttribute(systemWide, kAXFocusedApplicationAttribute) else {
+                return nil
+            }
+            appElement = app
+        }
 
-        guard let appElement: AXUIElement = copyAttribute(systemWide, kAXFocusedApplicationAttribute),
-              let focused: AXUIElement = copyAttribute(appElement, kAXFocusedUIElementAttribute)
-        else { return nil }
-
+        guard let focused: AXUIElement = copyAttribute(appElement, kAXFocusedUIElementAttribute) else {
+            return nil
+        }
         return frame(of: focused)
     }
 
@@ -44,7 +57,8 @@ public enum FocusedFieldLocator {
         AXValueGetValue(positionRef as! AXValue, .cgPoint, &position)
         AXValueGetValue(sizeRef as! AXValue, .cgSize, &size)
 
-        // AX coordinates have origin top-left of the primary display; flip to Cocoa.
+        // AX coordinates have origin at the top-left of the primary display.
+        // Flip into Cocoa screen coordinates (origin at the bottom-left).
         guard let screen = NSScreen.screens.first else { return nil }
         let flippedY = screen.frame.height - position.y - size.height
         return CGRect(x: position.x, y: flippedY, width: size.width, height: size.height)
