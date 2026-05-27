@@ -1,24 +1,33 @@
 name: Release
 
+# Triggered when a `v*` tag is pushed. Tag push is restricted by ruleset so
+# only the repo owner can create release tags. This workflow re-runs the full
+# build (so the artifacts attached to the Release exactly match what's in the
+# tagged source) and creates the GitHub Release.
 on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag for the release (e.g. v0.1.0)'
-        required: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release:
     runs-on: macos-14
     timeout-minutes: 30
+    permissions:
+      contents: write  # required to create the Release & upload assets
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden runner
+        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
@@ -43,23 +52,20 @@ jobs:
       - name: Package DMG
         run: bash scripts/package-dmg.sh
 
-      - name: Resolve tag
-        id: tag
+      - name: Compute checksums
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "name=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          fi
+          cd build
+          shasum -a 256 ClipHist.app.zip ClipHist.dmg | tee SHA256SUMS.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@7b4da11513bf3f43f9999e90eabced41ab8bb048 # v2.2.0
         with:
-          tag_name: ${{ steps.tag.outputs.name }}
-          name: ClipHist ${{ steps.tag.outputs.name }}
+          tag_name: ${{ github.ref_name }}
+          name: ClipHist ${{ github.ref_name }}
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
             build/ClipHist.app.zip
             build/ClipHist.dmg
+            build/SHA256SUMS.txt
