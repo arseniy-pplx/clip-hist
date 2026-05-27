@@ -99,17 +99,19 @@ public final class HistoryStore: @unchecked Sendable {
     }
 
     /// Eviction rule: pinned items are never evicted; only unpinned items count
-    /// against `capacity`. Oldest unpinned items are dropped first.
+    /// against `capacity`. Oldest unpinned items are dropped first; array index
+    /// breaks ties when `createdAt` collides (rapid-fire inserts).
     private func evictLocked() {
-        let unpinned = items.filter { !$0.isPinned }
-        guard unpinned.count > capacity else { return }
-        let excess = unpinned.count - capacity
-        // Mark the `excess` oldest unpinned items for removal.
-        let toRemoveIDs = Set(
-            unpinned.sorted(by: { $0.createdAt < $1.createdAt })
-                .prefix(excess)
-                .map(\.id)
-        )
+        let indexedUnpinned = items.enumerated().filter { !$0.element.isPinned }
+        guard indexedUnpinned.count > capacity else { return }
+        let excess = indexedUnpinned.count - capacity
+        let sortedOldestFirst = indexedUnpinned.sorted { l, r in
+            if l.element.createdAt != r.element.createdAt {
+                return l.element.createdAt < r.element.createdAt
+            }
+            return l.offset < r.offset
+        }
+        let toRemoveIDs = Set(sortedOldestFirst.prefix(excess).map(\.element.id))
         items.removeAll { toRemoveIDs.contains($0.id) }
     }
 
@@ -119,12 +121,20 @@ public final class HistoryStore: @unchecked Sendable {
 
     public func all() -> [ClipboardItem] { queue.sync { sortedLocked() } }
 
-    /// Pinned items first (newest pin first), then unpinned (newest first).
+    /// Pinned items first, then newest first. Uses array index as a stable
+    /// tiebreaker when `createdAt` values collide (which happens in tight
+    /// test loops where `Date()` resolution is insufficient).
     private func sortedLocked() -> [ClipboardItem] {
-        items.sorted { a, b in
+        let indexed = items.enumerated().map { ($0.offset, $0.element) }
+        let sorted = indexed.sorted { l, r in
+            let (li, a) = l
+            let (ri, b) = r
             if a.isPinned != b.isPinned { return a.isPinned && !b.isPinned }
-            return a.createdAt > b.createdAt
+            if a.createdAt != b.createdAt { return a.createdAt > b.createdAt }
+            // Same timestamp: items appended later (higher index) sort first.
+            return li > ri
         }
+        return sorted.map(\.1)
     }
 
     /// Returns a page of items, optionally filtered by a case-insensitive
