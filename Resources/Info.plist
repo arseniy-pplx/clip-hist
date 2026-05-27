@@ -6,8 +6,10 @@
     <key>CFBundleDisplayName</key><string>ClipHist</string>
     <key>CFBundleIdentifier</key><string>dev.arseniy.cliphist</string>
     <key>CFBundleExecutable</key><string>ClipHist</string>
-    <key>CFBundleShortVersionString</key><string>0.1.0</string>
-    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>CFBundleIconName</key><string>AppIcon</string>
+    <key>CFBundleShortVersionString</key><string>0.2.0</string>
+    <key>CFBundleVersion</key><string>2</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>LSUIElement</key><true/>

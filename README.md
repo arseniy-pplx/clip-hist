@@ -7,15 +7,20 @@ A lightweight macOS clipboard history manager. Lives in the menu bar, opens as a
 - **Menu-bar app** — no Dock icon, minimal footprint
 - **Configurable history size** — 10 to 1000 entries, capped on disk
 - **Pagination + search** — page through results, instant case-insensitive substring search
-- **Drop-down near focused input** — uses the Accessibility API to anchor the panel beside the field you're typing into (falls back to the status item if Accessibility isn't granted)
+- **Smart anchoring** — anchors the dropdown next to the focused text field of the previously-active app (Accessibility API)
 - **Global hotkey** — rebindable (default `⌃⌘V`) via Carbon `RegisterEventHotKey`
-- **Click-to-paste** — writes the entry back to the pasteboard and synthesizes `⌘V`
+- **Pinned items** — pin any entry to keep it at the top, exempt from capacity eviction
+- **Image previews** — thumbnails inline in the history list
+- **Hover + selection highlight** with full keyboard navigation
+- **Paste on click *or* select on click** — configurable, with `⏎` always pasting
+- **Click-to-paste** — writes the entry back to the pasteboard, returns focus to the destination app, and synthesizes `⌘V`
 - **Text, rich text, images, and file URLs**
 - **Privacy-aware** — ignores `org.nspasteboard.ConcealedType` (password managers) and a user-configurable ignored-bundle-ID list
 - **Persistence** — JSON store at `~/Library/Application Support/ClipHist/history.json`
 - **Launch at login** via `SMAppService`
 - **Clear-on-quit** opt-in
 - **Universal binary** — arm64 + x86_64
+- **Polished DMG installer** — drag-to-Applications layout with custom background and volume icon
 
 ## Requirements
 
@@ -50,11 +55,15 @@ open build/ClipHist.app
 | Action | Shortcut |
 |---|---|
 | Open history dropdown | `⌃⌘V` (rebindable) |
-| Paste highlighted entry | Click row, or `Return` |
-| Next page | `→` |
-| Previous page | `←` |
+| Move selection up / down | `↑` / `↓` (auto-paginates at edges) |
+| Paste selected entry | `⏎` |
+| Click row → paste / select | controlled by **Paste immediately on row click** setting |
+| Quick-paste row 1–9 | `⌘1` … `⌘9` |
+| Pin / unpin selected row | `⌘P` (or pin icon on hover) |
+| Delete selected entry | `⌫` (when search is empty) |
+| Close panel | `Esc` |
 | Search | type in the search field |
-| Open settings | menu-bar icon → right-click → Settings, or `⌘,` from the menu |
+| Open settings | menu-bar icon → right-click → Settings |
 
 ## Settings
 
@@ -64,6 +73,7 @@ Available from the status-item menu → **Settings…**
 - **Page size** — 5 to 50
 - **Open shortcut** — record any modifier + key combination
 - **Anchor near focused field** — toggle smart positioning
+- **Paste immediately on row click** — on: click pastes; off: click only refreshes the clipboard, `⏎` pastes
 - **Launch at login** — registers the app via `SMAppService`
 - **Ignored bundle IDs** — one per line; e.g. `com.1password.1password7`
 - **Clear on quit** — empty the store when the app terminates

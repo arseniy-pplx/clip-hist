@@ -9,6 +9,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
     public var ignoredBundleIDs: [String]
     public var clearOnQuit: Bool
     public var anchorNearFocusedField: Bool
+    /// If true, clicking a row pastes immediately. If false, click selects and ⏎ pastes.
+    public var pasteOnClick: Bool
 
     public init(
         maxEntries: Int = 100,
@@ -17,7 +19,8 @@ public struct AppSettings: Codable, Equatable, Sendable {
         launchAtLogin: Bool = false,
         ignoredBundleIDs: [String] = [],
         clearOnQuit: Bool = false,
-        anchorNearFocusedField: Bool = true
+        anchorNearFocusedField: Bool = true,
+        pasteOnClick: Bool = true
     ) {
         self.maxEntries = maxEntries
         self.pageSize = pageSize
@@ -26,6 +29,24 @@ public struct AppSettings: Codable, Equatable, Sendable {
         self.ignoredBundleIDs = ignoredBundleIDs
         self.clearOnQuit = clearOnQuit
         self.anchorNearFocusedField = anchorNearFocusedField
+        self.pasteOnClick = pasteOnClick
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        maxEntries = try c.decodeIfPresent(Int.self, forKey: .maxEntries) ?? 100
+        pageSize = try c.decodeIfPresent(Int.self, forKey: .pageSize) ?? 10
+        hotKey = try c.decodeIfPresent(HotKeySpec.self, forKey: .hotKey) ?? .default
+        launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
+        ignoredBundleIDs = try c.decodeIfPresent([String].self, forKey: .ignoredBundleIDs) ?? []
+        clearOnQuit = try c.decodeIfPresent(Bool.self, forKey: .clearOnQuit) ?? false
+        anchorNearFocusedField = try c.decodeIfPresent(Bool.self, forKey: .anchorNearFocusedField) ?? true
+        pasteOnClick = try c.decodeIfPresent(Bool.self, forKey: .pasteOnClick) ?? true
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case maxEntries, pageSize, hotKey, launchAtLogin, ignoredBundleIDs,
+             clearOnQuit, anchorNearFocusedField, pasteOnClick
     }
 
     public static let `default` = AppSettings()

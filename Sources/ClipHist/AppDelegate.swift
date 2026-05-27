@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private lazy var monitor = ClipboardMonitor(store: historyStore)
     private lazy var hotKey = HotKey()
+    private let frontmostTracker = FrontmostAppTracker()
     private var menuBar: MenuBarController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -26,7 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = MenuBarController(
             historyStore: historyStore,
             settingsProvider: { [weak self] in self?.settings ?? .default },
-            onUpdateSettings: { [weak self] new in self?.apply(settings: new) }
+            onUpdateSettings: { [weak self] new in self?.apply(settings: new) },
+            externalAppPIDProvider: { [weak self] in self?.frontmostTracker.lastExternalPID }
         )
         self.menuBar = controller
 

@@ -35,6 +35,7 @@ final class SettingsTests: XCTestCase {
         s.pageSize = 25
         s.ignoredBundleIDs = ["com.example.app"]
         s.clearOnQuit = true
+        s.pasteOnClick = false
         store.save(s)
 
         let loaded = store.load()
@@ -42,6 +43,25 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(loaded.pageSize, 25)
         XCTAssertEqual(loaded.ignoredBundleIDs, ["com.example.app"])
         XCTAssertTrue(loaded.clearOnQuit)
+        XCTAssertFalse(loaded.pasteOnClick)
+    }
+
+    func testBackwardCompatibleSettingsDecode() throws {
+        // JSON produced by v0.1 (without pasteOnClick) must decode cleanly.
+        let oldJSON = """
+        {
+          "maxEntries": 100,
+          "pageSize": 10,
+          "hotKey": { "modifiers": 4352, "keyCode": 9 },
+          "launchAtLogin": false,
+          "ignoredBundleIDs": [],
+          "clearOnQuit": false,
+          "anchorNearFocusedField": true
+        }
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: oldJSON)
+        XCTAssertEqual(decoded.maxEntries, 100)
+        XCTAssertTrue(decoded.pasteOnClick, "new field should default to true")
     }
 
     func testDefaultsWhenMissing() {

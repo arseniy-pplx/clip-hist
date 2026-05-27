@@ -52,6 +52,13 @@ esac
 chmod +x "$MACOS_DIR/ClipHist"
 cp "$ROOT/Resources/Info.plist" "$CONTENTS/Info.plist"
 
+# Generate and embed AppIcon.icns.
+if bash "$ROOT/scripts/make-icon.sh"; then
+  if [[ -f "$ROOT/scripts/build/AppIcon.icns" ]]; then
+    cp "$ROOT/scripts/build/AppIcon.icns" "$RES_DIR/AppIcon.icns"
+  fi
+fi
+
 # Ad-hoc sign so the app runs without "damaged" warnings on the build machine.
 codesign --force --deep --sign - "$APP_DIR" || true
 

@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var launchAtLogin: Bool
     @State private var clearOnQuit: Bool
     @State private var anchorNearFocusedField: Bool
+    @State private var pasteOnClick: Bool
     @State private var ignoredBundles: String
     @State private var hotKey: HotKeySpec
     @State private var recording = false
@@ -22,64 +23,121 @@ struct SettingsView: View {
         _launchAtLogin = State(initialValue: initial.launchAtLogin)
         _clearOnQuit = State(initialValue: initial.clearOnQuit)
         _anchorNearFocusedField = State(initialValue: initial.anchorNearFocusedField)
+        _pasteOnClick = State(initialValue: initial.pasteOnClick)
         _ignoredBundles = State(initialValue: initial.ignoredBundleIDs.joined(separator: "\n"))
         _hotKey = State(initialValue: initial.hotKey)
     }
 
     var body: some View {
-        Form {
-            Section("History") {
-                HStack {
-                    Text("Max entries: \(Int(maxEntries))").frame(width: 140, alignment: .leading)
-                    Slider(value: $maxEntries, in: 10...1000, step: 10)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                section("History") {
+                    sliderRow(
+                        label: "Max entries",
+                        value: $maxEntries,
+                        range: 10...1000,
+                        step: 10,
+                        valueText: "\(Int(maxEntries))"
+                    )
+                    sliderRow(
+                        label: "Page size",
+                        value: $pageSize,
+                        range: 5...50,
+                        step: 1,
+                        valueText: "\(Int(pageSize))"
+                    )
+                    Toggle("Clear history on quit", isOn: $clearOnQuit)
                 }
-                HStack {
-                    Text("Page size: \(Int(pageSize))").frame(width: 140, alignment: .leading)
-                    Slider(value: $pageSize, in: 5...50, step: 1)
-                }
-                Toggle("Clear history on quit", isOn: $clearOnQuit)
-            }
 
-            Section("Shortcut") {
-                HStack {
-                    Text("Open panel:").frame(width: 140, alignment: .leading)
-                    Button(action: recordShortcut) {
-                        Text(recording ? "Press a key…" : hotKey.displayString)
-                            .frame(minWidth: 120)
+                section("Shortcut") {
+                    HStack(spacing: 12) {
+                        Text("Open panel")
+                            .frame(width: labelWidth, alignment: .leading)
+                        Button(action: { recording = true }) {
+                            Text(recording ? "Press a key…" : hotKey.displayString)
+                                .frame(minWidth: 120)
+                        }
+                        Button("Reset") { hotKey = .default }
+                        Spacer(minLength: 0)
                     }
-                    Button("Reset") { hotKey = .default }
                 }
-            }
 
-            Section("Behavior") {
-                Toggle("Anchor panel near focused input field", isOn: $anchorNearFocusedField)
-                Toggle("Launch at login", isOn: $launchAtLogin)
-            }
+                section("Behavior") {
+                    Toggle("Anchor panel near focused input field", isOn: $anchorNearFocusedField)
+                    Toggle("Paste immediately on row click", isOn: $pasteOnClick)
+                        .help("If off, clicking a row only copies it to the clipboard. Press ⏎ to paste.")
+                    Toggle("Launch at login", isOn: $launchAtLogin)
+                }
 
-            Section("Ignored apps (one bundle ID per line)") {
-                TextEditor(text: $ignoredBundles)
-                    .frame(height: 80)
-                    .font(.system(.body, design: .monospaced))
-                    .border(Color.secondary.opacity(0.3))
-                Text("Example: com.1password.1password7, com.apple.keychainaccess")
-                    .font(.caption).foregroundColor(.secondary)
-            }
+                section("Ignored apps") {
+                    Text("One bundle ID per line. Clipboard changes from these apps are skipped.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextEditor(text: $ignoredBundles)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(height: 90)
+                        .padding(4)
+                        .background(Color.secondary.opacity(0.08))
+                        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3), lineWidth: 0.5))
+                    Text("Example: com.1password.1password7")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
 
-            HStack {
-                Spacer()
-                Button("Save") { save() }.keyboardShortcut(.defaultAction)
+                HStack {
+                    Spacer()
+                    Button("Cancel") { NSApp.keyWindow?.close() }
+                    Button("Save") { save() }
+                        .keyboardShortcut(.defaultAction)
+                }
+                .padding(.top, 4)
             }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
-        .frame(width: 440)
-        .onExitCommand { save() }
+        .frame(width: 540, height: 540)
         .background(KeyCaptureView(active: $recording) { spec in
             hotKey = spec
             recording = false
         })
     }
 
-    private func recordShortcut() { recording = true }
+    // MARK: - Helpers
+
+    private let labelWidth: CGFloat = 110
+
+    @ViewBuilder
+    private func section<Content: View>(
+        _ title: String,
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+                .foregroundColor(.secondary)
+            content()
+        }
+    }
+
+    @ViewBuilder
+    private func sliderRow(
+        label: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double,
+        valueText: String
+    ) -> some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .frame(width: labelWidth, alignment: .leading)
+            Slider(value: value, in: range, step: step)
+                .frame(maxWidth: 280)
+            Text(valueText)
+                .frame(width: 50, alignment: .trailing)
+                .monospacedDigit()
+                .foregroundColor(.secondary)
+        }
+    }
 
     private func save() {
         let bundles = ignoredBundles
@@ -93,15 +151,15 @@ struct SettingsView: View {
             launchAtLogin: launchAtLogin,
             ignoredBundleIDs: bundles,
             clearOnQuit: clearOnQuit,
-            anchorNearFocusedField: anchorNearFocusedField
+            anchorNearFocusedField: anchorNearFocusedField,
+            pasteOnClick: pasteOnClick
         )
         onSave(new)
     }
 }
 
 /// Captures the next key combination pressed while `active` is true and
-/// reports it as a `HotKeySpec`. Lives inside an `NSViewRepresentable` so it
-/// can install a local key-down monitor scoped to this window.
+/// reports it as a `HotKeySpec`.
 private struct KeyCaptureView: NSViewRepresentable {
     @Binding var active: Bool
     let onCapture: (HotKeySpec) -> Void
