@@ -1,5 +1,10 @@
 # ClipHist
 
+[![CI](https://github.com/arseniy-pplx/clip-hist/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arseniy-pplx/clip-hist/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/arseniy-pplx/clip-hist/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/arseniy-pplx/clip-hist/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-macOS%2013%2B-blue)](https://www.apple.com/macos)
+
 A lightweight macOS clipboard history manager. Lives in the menu bar, opens as a dropdown near the input field you're typing into, paginates through your history, and pastes back with a single click or keystroke.
 
 ## Features

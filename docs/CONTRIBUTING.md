@@ -1,5 +1,9 @@
 # Contributing
 
+Thanks for taking an interest in ClipHist. Before you start, please read the
+[Code of Conduct](../CODE_OF_CONDUCT.md). For security issues, do **not** open a
+public issue — see [SECURITY.md](../SECURITY.md) for the private reporting flow.
+
 ## Branching
 
 - All changes go through pull request review — never push to `main`.
@@ -35,9 +39,19 @@ docs(readme): clarify Accessibility permission
 ci: bump macos runner to 14
 ```
 
+## CI behaviour
+
+- The **CI** workflow runs `swift test` on every PR to `main` and every push to `main`.
+- The **Build** workflow (universal `.app` + `.dmg`) does **not** run on PRs. It only runs on `workflow_dispatch` by the repo owner or on `v*` tag push (tag push is restricted to admins by ruleset).
+- The **Release** workflow runs on `v*` tag push and creates the GitHub Release with attached assets and SHA-256 checksums.
+- The **CodeQL** workflow runs on PRs, pushes to main, and weekly.
+- The **Dependency Review** workflow checks any dependency changes on PRs.
+
+First-time outside-contributor PRs require maintainer approval ("Approve and run") before any workflow executes.
+
 ## Releasing
 
 1. Bump `CFBundleShortVersionString` in `Resources/Info.plist`.
 2. Update `CHANGELOG.md`.
-3. Tag: `git tag v0.2.0 && git push --tags`.
-4. The `Release` workflow builds the universal `.app`, packages a `.dmg`, and attaches both to the GitHub Release.
+3. Tag: `git tag v0.2.0 && git push --tags` (only admins can push `v*` tags).
+4. The Release workflow builds the universal `.app`, packages a `.dmg`, computes SHA-256 checksums, and attaches all three to the GitHub Release.

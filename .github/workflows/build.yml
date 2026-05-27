@@ -1,0 +1,101 @@
+name: Build
+
+# This workflow builds the universal `.app` and the `.dmg` installer.
+# It is deliberately gated so that arbitrary PRs and feature-branch pushes
+# CANNOT spend the heavy build minutes:
+#
+#   1. `workflow_dispatch` — only the repo owner can dispatch via the UI/API.
+#   2. `push: tags: [v*]` — tag push is restricted by the `tag-protection`
+#      ruleset to repo admins only.
+#
+# It deliberately does NOT trigger on `pull_request` or branch push.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or SHA to build (defaults to current)'
+        required: false
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build .app and .dmg
+    runs-on: macos-14
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@0080882f6c36860b6ba35c610c98ce87d4e2f26f # v2.10.2
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Install Pillow (for icon + DMG background)
+        run: python3 -m pip install --quiet --break-system-packages Pillow
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Test
+        run: swift test -v
+
+      - name: Build universal .app
+        run: bash scripts/build-app.sh --arch universal
+
+      - name: Verify binary
+        run: |
+          file build/ClipHist.app/Contents/MacOS/ClipHist
+          lipo -info build/ClipHist.app/Contents/MacOS/ClipHist
+          ls -la build/ClipHist.app/Contents/Resources/
+
+      - name: Zip .app
+        run: |
+          cd build
+          ditto -c -k --sequesterRsrc --keepParent ClipHist.app ClipHist.app.zip
+
+      - name: Build DMG installer
+        run: bash scripts/package-dmg.sh
+
+      - name: Compute checksums
+        run: |
+          cd build
+          shasum -a 256 ClipHist.app.zip ClipHist.dmg | tee SHA256SUMS.txt
+
+      - name: Upload .app artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: ClipHist-app-${{ github.sha }}
+          path: build/ClipHist.app.zip
+          retention-days: 30
+
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: ClipHist-dmg-${{ github.sha }}
+          path: build/ClipHist.dmg
+          retention-days: 30
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: SHA256SUMS-${{ github.sha }}
+          path: build/SHA256SUMS.txt
+          retention-days: 30

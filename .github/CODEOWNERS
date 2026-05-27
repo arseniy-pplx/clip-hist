@@ -1,0 +1,7 @@
+# Default owner — required reviewer for all changes.
+* @arseniy-pplx
+
+# Workflows and security-sensitive files always need owner review.
+/.github/         @arseniy-pplx
+SECURITY.md       @arseniy-pplx
+CODEOWNERS        @arseniy-pplx
