@@ -4,7 +4,7 @@ import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsStore = SettingsStore()
-    private(set) var settings: Settings = .default
+    private(set) var settings: AppSettings = .default
 
     private(set) lazy var historyStore: HistoryStore = {
         HistoryStore(
@@ -44,7 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Settings application
 
-    func apply(settings new: Settings) {
+    func apply(settings new: AppSettings) {
         let validated = new.validated()
         settings = validated
         settingsStore.save(validated)

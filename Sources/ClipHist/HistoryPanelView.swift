@@ -3,7 +3,7 @@ import ClipHistCore
 
 struct HistoryPanelView: View {
     let store: HistoryStore
-    let settings: Settings
+    let settings: AppSettings
     let onPick: (ClipboardItem) -> Void
     let onOpenSettings: () -> Void
     let onClear: () -> Void

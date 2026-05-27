@@ -4,11 +4,11 @@ import XCTest
 final class SettingsTests: XCTestCase {
 
     func testValidationClampsValues() {
-        let s = Settings(maxEntries: 5, pageSize: 1).validated()
+        let s = AppSettings(maxEntries: 5, pageSize: 1).validated()
         XCTAssertEqual(s.maxEntries, 10)
         XCTAssertEqual(s.pageSize, 5)
 
-        let big = Settings(maxEntries: 10_000, pageSize: 10_000).validated()
+        let big = AppSettings(maxEntries: 10_000, pageSize: 10_000).validated()
         XCTAssertEqual(big.maxEntries, 1000)
         XCTAssertEqual(big.pageSize, 100)
     }
@@ -30,7 +30,7 @@ final class SettingsTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suite) }
 
         let store = SettingsStore(defaults: defaults, key: "k")
-        var s = Settings.default
+        var s = AppSettings.default
         s.maxEntries = 250
         s.pageSize = 25
         s.ignoredBundleIDs = ["com.example.app"]
@@ -49,6 +49,6 @@ final class SettingsTests: XCTestCase {
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = SettingsStore(defaults: defaults, key: "absent")
-        XCTAssertEqual(store.load(), .default)
+        XCTAssertEqual(store.load(), AppSettings.default)
     }
 }

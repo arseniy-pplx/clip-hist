@@ -5,8 +5,8 @@ import ClipHistCore
 /// Owns the status-bar item and the floating dropdown panel.
 final class MenuBarController: NSObject, NSWindowDelegate {
     private let historyStore: HistoryStore
-    private let settingsProvider: () -> Settings
-    private let onUpdateSettings: (Settings) -> Void
+    private let settingsProvider: () -> AppSettings
+    private let onUpdateSettings: (AppSettings) -> Void
 
     private let statusItem: NSStatusItem
     private var panel: NSPanel?
@@ -14,8 +14,8 @@ final class MenuBarController: NSObject, NSWindowDelegate {
 
     init(
         historyStore: HistoryStore,
-        settingsProvider: @escaping () -> Settings,
-        onUpdateSettings: @escaping (Settings) -> Void
+        settingsProvider: @escaping () -> AppSettings,
+        onUpdateSettings: @escaping (AppSettings) -> Void
     ) {
         self.historyStore = historyStore
         self.settingsProvider = settingsProvider

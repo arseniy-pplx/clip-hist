@@ -1,7 +1,7 @@
 import Foundation
 
 /// User-configurable settings persisted via `UserDefaults`.
-public struct Settings: Codable, Equatable, Sendable {
+public struct AppSettings: Codable, Equatable, Sendable {
     public var maxEntries: Int
     public var pageSize: Int
     public var hotKey: HotKeySpec
@@ -28,10 +28,10 @@ public struct Settings: Codable, Equatable, Sendable {
         self.anchorNearFocusedField = anchorNearFocusedField
     }
 
-    public static let `default` = Settings()
+    public static let `default` = AppSettings()
 
     /// Clamp values to safe ranges before applying.
-    public func validated() -> Settings {
+    public func validated() -> AppSettings {
         var copy = self
         copy.maxEntries = min(max(copy.maxEntries, 10), 1000)
         copy.pageSize = min(max(copy.pageSize, 5), 100)
@@ -88,17 +88,17 @@ public final class SettingsStore: @unchecked Sendable {
         self.key = key
     }
 
-    public func load() -> Settings {
+    public func load() -> AppSettings {
         guard
             let data = defaults.data(forKey: key),
-            let decoded = try? JSONDecoder().decode(Settings.self, from: data)
+            let decoded = try? JSONDecoder().decode(AppSettings.self, from: data)
         else {
             return .default
         }
         return decoded.validated()
     }
 
-    public func save(_ settings: Settings) {
+    public func save(_ settings: AppSettings) {
         let validated = settings.validated()
         guard let data = try? JSONEncoder().encode(validated) else { return }
         defaults.set(data, forKey: key)

@@ -2,8 +2,8 @@ import SwiftUI
 import ClipHistCore
 
 struct SettingsView: View {
-    let initial: Settings
-    let onSave: (Settings) -> Void
+    let initial: AppSettings
+    let onSave: (AppSettings) -> Void
 
     @State private var maxEntries: Double
     @State private var pageSize: Double
@@ -14,7 +14,7 @@ struct SettingsView: View {
     @State private var hotKey: HotKeySpec
     @State private var recording = false
 
-    init(initial: Settings, onSave: @escaping (Settings) -> Void) {
+    init(initial: AppSettings, onSave: @escaping (AppSettings) -> Void) {
         self.initial = initial
         self.onSave = onSave
         _maxEntries = State(initialValue: Double(initial.maxEntries))
@@ -86,7 +86,7 @@ struct SettingsView: View {
             .split(whereSeparator: { $0.isNewline || $0 == "," })
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        let new = Settings(
+        let new = AppSettings(
             maxEntries: Int(maxEntries),
             pageSize: Int(pageSize),
             hotKey: hotKey,
