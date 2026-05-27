@@ -1,0 +1,6 @@
+--indent 4
+--maxwidth 120
+--swiftversion 5.9
+--self remove
+--stripunusedargs closure-only
+--exclude .build,build,Package.swift
