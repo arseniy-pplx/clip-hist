@@ -58,7 +58,7 @@ jobs:
           shasum -a 256 ClipHist.app.zip ClipHist.dmg | tee SHA256SUMS.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@7b4da11513bf3f43f9999e90eabced41ab8bb048 # v2.2.0
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           tag_name: ${{ github.ref_name }}
           name: ClipHist ${{ github.ref_name }}
